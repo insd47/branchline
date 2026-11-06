@@ -1,0 +1,26 @@
+[package]
+name = "branchline-build"
+description = "Generates a typed resource-chain client from an OpenAPI 3.1 document, in build.rs"
+keywords = ["openapi", "codegen", "generator", "client", "build"]
+categories = ["development-tools::build-utils", "api-bindings"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "../../README.md"
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+syn.workspace = true
+typify.workspace = true
+
+[dev-dependencies]
+prettyplease.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,29 @@
+name: Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo test --workspace --all-features
