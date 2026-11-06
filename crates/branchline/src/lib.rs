@@ -22,8 +22,6 @@
 //! - `sigv4`: [`SigV4`], `Http` plus AWS SigV4 signing for IAM-authenticated endpoints such as Lambda Function URLs.
 
 pub use error::Error;
-#[cfg(feature = "reqwest")]
-pub use failure::HttpError;
 pub use http;
 #[cfg(feature = "reqwest")]
 pub use plain::Http;
@@ -38,8 +36,6 @@ pub use transport::Transport;
 pub use bon;
 
 mod error;
-#[cfg(feature = "reqwest")]
-mod failure;
 mod include;
 mod path;
 #[cfg(feature = "reqwest")]

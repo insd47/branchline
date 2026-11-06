@@ -50,12 +50,12 @@ impl<T: Transport> Route<T> {
         let query = query
             .map(serde_html_form::to_string)
             .transpose()
-            .map_err(|error| Error::Encode(error.to_string()))?;
+            .map_err(Error::Query)?;
 
         let body = body
             .map(serde_json::to_vec)
             .transpose()
-            .map_err(|error| Error::Encode(error.to_string()))?
+            .map_err(Error::Body)?
             .unwrap_or_default();
 
         let bytes = self
