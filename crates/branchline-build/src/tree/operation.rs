@@ -56,7 +56,7 @@ impl Operation {
         let verb = syn::Ident::new(&self.method.to_ascii_uppercase(), proc_macro2::Span::call_site());
         let doc = self.doc.clone().unwrap_or_else(|| format!("`{verb} /{path}`"));
         let response = &self.response;
-        let (runtime, error) = (&paths.runtime, &paths.error);
+        let (runtime, error) = (&paths.runtime, paths.error());
 
         let (query_arg, query_value) = match &self.query {
             Some(path) => (quote! { query: &#path, }, quote! { Some(query) }),

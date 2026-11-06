@@ -5,22 +5,22 @@
 //!
 //! ```ignore
 //! // build.rs
-//! let document: serde_json::Value = serde_json::from_slice(&std::fs::read("openapi.json")?)?;
-//! let tokens = branchline_build::Generator::new("crate::Transport", "crate::Error")?.generate(&document)?;
-//! std::fs::write(out.join("api.rs"), prettyplease::unparse(&syn::parse2(tokens)?))?;
+//! branchline_build::configure().compile("openapi.json")?;
 //!
 //! // src/lib.rs
-//! include!(concat!(env!("OUT_DIR"), "/api.rs"));
-//! let api = Api::from(branchline::Route::new(Transport::new(base)));
+//! branchline::include!();
+//! let api = Api::new(branchline::Http::new("https://api.example.com")?);
 //! let notices = api.contests().id(7).notices().get().await?;
 //! ```
 //!
 //! The generated code refers to `branchline` (the runtime), `serde` and `serde_json`, so the crate that includes it
 //! depends on all three. Only JSON bodies and query parameters are generated; header and cookie parameters are ignored.
 
-pub use generator::Generator;
+pub use error::Error;
+pub use generator::{Generator, configure};
 
 mod builders;
+mod error;
 mod generator;
 mod tree;
 mod types;
