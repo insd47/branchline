@@ -114,8 +114,29 @@ let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).aw
 let api = Api::new(branchline::SigV4::new(function_url, &config, "lambda")?);
 ```
 
-Both send JSON and return `branchline::HttpError`, with `HttpError::Status` for non-2xx responses. Wrap one in your own
+Both send JSON and return `branchline::Error`, with `Error::Status` for non-2xx responses. Wrap one in your own
 transport to add checks or map errors.
+
+### Errors
+
+Generated methods return the transport's error. The built-in transports use `branchline::Error`, which keeps the errors
+of the crates underneath as they are, so their sources survive:
+
+| Variant | Holds | When |
+| --- | --- | --- |
+| `Query` | `serde_html_form::ser::Error` | the query could not be encoded |
+| `Body` | `serde_json::Error` | the body could not be encoded |
+| `Decode` | `serde_json::Error` | the response did not match the contract |
+| `Url` | `url::ParseError` | the base URL or path is not a valid URL (`reqwest`) |
+| `Request` | `http::Error` | the request could not be built (`reqwest`) |
+| `Send` | `reqwest::Error` | the request never reached the server (`reqwest`) |
+| `Status` | status and body | a non-2xx response (`reqwest`) |
+| `Credentials` | `aws_credential_types::provider::error::CredentialsError` | no credentials or region, or the provider failed (`sigv4`) |
+| `Sign` | `aws_sigv4::http_request::SigningError` | the request could not be signed (`sigv4`) |
+
+Transport variants exist only with their feature. The enum is `#[non_exhaustive]`, so turning a feature on does not
+break your `match`. Your own transport's error only has to convert from `branchline::Error`; with
+[thiserror](https://crates.io/crates/thiserror) that is one `#[error(transparent)]` variant with `#[from]`.
 
 ### Features
 

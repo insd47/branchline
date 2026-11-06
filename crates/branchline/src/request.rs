@@ -1,6 +1,6 @@
 //! Building and sending requests, shared by the built-in transports.
 
-use crate::HttpError;
+use crate::Error;
 use bytes::Bytes;
 use http::Method;
 use url::Url;
@@ -9,43 +9,42 @@ use url::Url;
 pub const HEADERS: [(&str, &str); 2] = [("content-type", "application/json"), ("accept", "application/json")];
 
 /// Joins `path` and `query` onto `base`, which must end with `/` to keep its own path.
-pub fn url(base: &Url, path: &str, query: Option<&str>) -> Result<Url, HttpError> {
-    let mut url = base.join(path).map_err(|error| HttpError::Url(error.to_string()))?;
+pub fn url(base: &Url, path: &str, query: Option<&str>) -> Result<Url, Error> {
+    let mut url = base.join(path)?;
     url.set_query(query.filter(|query| !query.is_empty()));
     Ok(url)
 }
 
 /// Parses a base URL and makes sure it ends with `/`.
-pub fn base(url: &str) -> Result<Url, HttpError> {
+pub fn base(url: &str) -> Result<Url, Error> {
     let url = match url.ends_with('/') {
         true => url.to_owned(),
         false => format!("{url}/"),
     };
 
-    Url::parse(&url).map_err(|error| HttpError::Url(error.to_string()))
+    Ok(Url::parse(&url)?)
 }
 
 /// Builds the request with the shared headers.
-pub fn build(method: Method, url: &Url, body: Vec<u8>) -> Result<http::Request<Vec<u8>>, HttpError> {
-    HEADERS
+pub fn build(method: Method, url: &Url, body: Vec<u8>) -> Result<http::Request<Vec<u8>>, Error> {
+    Ok(HEADERS
         .iter()
         .fold(
             http::Request::builder().method(method).uri(url.as_str()),
             |request, (name, value)| request.header(*name, *value),
         )
-        .body(body)
-        .map_err(|error| HttpError::Url(error.to_string()))
+        .body(body)?)
 }
 
 /// Sends the request and returns the body of a 2xx response.
-pub async fn send(client: &reqwest::Client, request: http::Request<Vec<u8>>) -> Result<Bytes, HttpError> {
+pub async fn send(client: &reqwest::Client, request: http::Request<Vec<u8>>) -> Result<Bytes, Error> {
     let response = client.execute(reqwest::Request::try_from(request)?).await?;
     let status = response.status();
     let bytes = response.bytes().await?;
 
     match status.is_success() {
         true => Ok(bytes),
-        false => Err(HttpError::Status {
+        false => Err(Error::Status {
             status,
             body: String::from_utf8_lossy(&bytes).into_owned(),
         }),
