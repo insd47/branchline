@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "branchline"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aws-credential-types",
  "aws-sigv4",
@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "branchline-build"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
