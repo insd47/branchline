@@ -61,7 +61,8 @@ impl Tree {
 
     /// Rejects segments whose generated names would clash, before generating code that does not compile.
     fn admit(&self, path: &str, module: &str, param: bool) -> Result<(), String> {
-        let reserved = ["get", "post", "put", "patch", "delete", "types", "new"];
+        // `t` would become the node `T`, which is also the transport parameter.
+        let reserved = ["get", "post", "put", "patch", "delete", "types", "new", "t"];
         let clash = self.children.get(module).is_some_and(|child| child.param != param);
 
         match reserved.contains(&module) || clash {
@@ -72,15 +73,32 @@ impl Tree {
         }
     }
 
-    /// Generates the root node and the tree below it.
+    /// Generates the root node and the tree below it. Generic roots also get `new(transport)`.
     pub fn stream(&self, paths: &Paths) -> TokenStream {
-        self.node(&paths.root, "", paths)
+        let tree = self.node(&paths.root, "", paths);
+        let (root, runtime) = (&paths.root, &paths.runtime);
+
+        let constructor = paths.generic().then(|| {
+            quote! {
+                impl<T: #runtime::Transport> #root<T> {
+                    /// Starts the chain at the service root with `transport`.
+                    pub fn new(transport: T) -> Self {
+                        Self(#runtime::Route::new(transport))
+                    }
+                }
+            }
+        });
+
+        quote! {
+            #tree
+            #constructor
+        }
     }
 
     fn node(&self, class: &syn::Ident, path: &str, paths: &Paths) -> TokenStream {
         let doc = format!("`/{path}`");
         let operations = self.operations.iter().map(|operation| operation.stream(path, paths));
-        let route = paths.route();
+        let (route, params, bounds) = (paths.route(), paths.params(), paths.bounds());
 
         let children: Vec<_> = self
             .children
@@ -93,7 +111,7 @@ impl Tree {
 
         let accessors = children
             .iter()
-            .map(|(module, child, path)| child.accessor(module, path));
+            .map(|(module, child, path)| child.accessor(module, path, paths));
 
         let modules = children.iter().map(|(module, child, path)| {
             let class = Name(module).class();
@@ -114,15 +132,15 @@ impl Tree {
         quote! {
             #[doc = #doc]
             #[derive(Debug, Clone)]
-            pub struct #class(#route);
+            pub struct #class #params (#route);
 
-            impl ::std::convert::From<#route> for #class {
+            impl #bounds ::std::convert::From<#route> for #class #params {
                 fn from(route: #route) -> Self {
                     Self(route)
                 }
             }
 
-            impl #class {
+            impl #bounds #class #params {
                 #(#operations)*
                 #(#accessors)*
             }
@@ -132,15 +150,16 @@ impl Tree {
     }
 
     /// Generates the method on the parent that leads to this node. `path` is this node's path.
-    fn accessor(&self, module: &str, path: &str) -> TokenStream {
+    fn accessor(&self, module: &str, path: &str, paths: &Paths) -> TokenStream {
         let name = Name(module).ident();
         let class = Name(module).class();
         let doc = format!("`/{path}`");
+        let params = paths.params();
 
         match self.param {
             true => quote! {
                 #[doc = #doc]
-                pub fn #name(&self, value: impl ::std::fmt::Display) -> #name::#class {
+                pub fn #name(&self, value: impl ::std::fmt::Display) -> #name::#class #params {
                     self.0.param(value).into()
                 }
             },
@@ -148,7 +167,7 @@ impl Tree {
                 let segment = &self.segment;
                 quote! {
                     #[doc = #doc]
-                    pub fn #name(&self) -> #name::#class {
+                    pub fn #name(&self) -> #name::#class #params {
                         self.0.join(#segment).into()
                     }
                 }

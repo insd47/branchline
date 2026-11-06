@@ -20,37 +20,36 @@ api.contests().id(7).notices().post(&body).await?;            // POST /contests/
 
 ```toml
 [dependencies]
-branchline = { version = "0.1", features = ["sigv4"] }   # or "reqwest", or neither with your own Transport
+branchline = { version = "0.2", features = ["reqwest"] }   # or "sigv4", or neither with your own Transport
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [build-dependencies]
-branchline-build = "0.1"
-prettyplease = "0.3"
-serde_json = "1"
-syn = "3"
+branchline-build = "0.2"
 ```
 
 ```rust
 // build.rs
-fn main() {
-    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    let document: serde_json::Value = serde_json::from_slice(&std::fs::read("openapi.json").unwrap()).unwrap();
-
-    let tokens = branchline_build::Generator::new("crate::Transport", "crate::Error")
-        .and_then(|generator| generator.root("Api"))
-        .and_then(|generator| generator.generate(&document))
-        .unwrap();
-
-    let file = syn::parse2(tokens).unwrap();
-    std::fs::write(out.join("api.rs"), prettyplease::unparse(&file)).unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    branchline_build::configure().compile("openapi.json")?;
+    Ok(())
 }
 ```
 
 ```rust
 // src/lib.rs
-include!(concat!(env!("OUT_DIR"), "/api.rs"));
+branchline::include!();
 
+let api = Api::new(branchline::Http::new("https://api.example.com/v1")?);
+let contests = api.contests().get().await?;
+```
+
+`compile` reads the document, writes the client to `OUT_DIR`, and reruns the build script when the document changes.
+The nodes are generic over the transport (`Api<T>`) and return its error.
+
+### Your own transport
+
+```rust
 #[derive(Debug, Clone)]
 pub struct Transport { /* base URL, HTTP client, credentials */ }
 
@@ -67,9 +66,29 @@ impl branchline::Transport for Transport {
         // Join `path` onto the base URL, sign, send, and map non-2xx responses to `Error`.
     }
 }
-
-let api = Api::from(branchline::Route::new(Transport::new(base)));
 ```
+
+To keep the generated API free of generics, write your transport into the code instead. The root then has no `new`,
+so you can add your own constructor:
+
+```rust
+// build.rs
+branchline_build::configure()
+    .root("Contest")
+    .transport("crate::Transport", "crate::Error")
+    .compile("openapi.json")?;
+
+// src/lib.rs
+branchline::include!("contest");
+
+impl Contest {
+    pub fn new(base: &str) -> Result<Self, Error> {
+        Ok(branchline::Route::new(Transport::new(base)?).into())
+    }
+}
+```
+
+`Generator::generate` returns the tokens instead of writing a file, for build scripts that add their own items.
 
 ### Request bodies and queries
 
@@ -83,16 +102,16 @@ api.contests().id(7).notices().post(&body).await?;
 ```
 
 `String` setters take `impl Into<String>`. Fields typify marks `#[serde(default)]` (optional arrays, schema defaults)
-are optional in the builder too. To skip builders, call `Generator::builders(false)` and turn off the runtime's
-default `bon` feature together.
+are optional in the builder too. To skip builders, call `.builders(false)` and turn off the runtime's default `bon`
+feature together.
 
 ### Built-in transports
 
 ```rust
-let api = Api::from(branchline::Route::new(branchline::Http::new("https://api.example.com/v1")?));
+let api = Api::new(branchline::Http::new("https://api.example.com/v1")?);
 
 let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-let api = Api::from(branchline::Route::new(branchline::SigV4::new(function_url, &config, "lambda")?));
+let api = Api::new(branchline::SigV4::new(function_url, &config, "lambda")?);
 ```
 
 Both send JSON and return `branchline::HttpError`, with `HttpError::Status` for non-2xx responses. Wrap one in your own

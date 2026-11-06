@@ -4,6 +4,10 @@
 //! parameter is a node that takes a value, and every HTTP method on a path is an async method on its node.
 //!
 //! ```ignore
+//! // build.rs: branchline_build::configure().compile("openapi.json")?;
+//! branchline::include!();
+//!
+//! let api = Api::new(branchline::Http::new("https://api.example.com")?);
 //! let notices = api.contests().id(7).notices().get().await?;
 //! ```
 //!
@@ -36,6 +40,7 @@ pub use bon;
 mod error;
 #[cfg(feature = "reqwest")]
 mod failure;
+mod include;
 mod path;
 #[cfg(feature = "reqwest")]
 mod plain;
